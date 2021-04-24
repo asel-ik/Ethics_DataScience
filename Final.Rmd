@@ -1,0 +1,1160 @@
+---
+title: "Replication of 'The Managerial Effects of Algorithmic Fairness Activism'"
+subtitle: "by Bo Cowgill, Fabrizio Dell'Acqua, and Sandra Matz."
+author: "Asel Kushkeyeva"
+date: 2021-04-24
+lang: "en"
+output:
+  pdf_document:
+    template: report.tex
+    toc: true
+    toc_depth: 2
+titlepage: true
+titlepage-color: "66261D"
+titlepage-text-color: "FFFFFF"
+titlepage-rule-color: "FFFFFF"
+titlepage-rule-height: 2
+---
+
+```{r, include=TRUE, echo=FALSE, warning=FALSE, message=FALSE}
+library(tidyverse)
+# this should supress all code and messages
+knitr::opts_chunk$set(include=TRUE, echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+
+\newpage
+
+# Abstract
+
+A growing interest in ethical discussions of artificial intelligence (AI) adoption and algorithmic bias in industry and society has led to exploration of business decision-makers’ reaction to the debates. I replicated The Managerial Effects of Algorithmic Fairness Activism by Bo Cowgill, Fabrizio Dell’Acqua, and Sandra Matz published in American Economic Association journal in 2020. The authors conducted two studies through a survey. For the first study, the respondents were given two types of op-eds - counterfactual to AI adoption and accepting it as something unavoidable - to test whether their decisions were influenced by them in two business cases: hiring and lending. The second study examined an influence of “scientific veneer” on managerial decision-making for the same business cases. I chose to focus on two questions: (1) If you were forced to make a decision on the future use of the algorithm now, what would you do? (2) What is the probability that a fairness issue is alleged and becomes a problem (through lawsuits or PR)? Responses to the questions were recorded as binary and on a Likert scale, thus, I fitted a multiple logistic and linear regressions. In the first study, being exposed to both op-eds influenced the respondents’ opinion to recommend AI negatively.  This trend, however, changed with introduction of op-eds and an algorithmic fix - a 6-month effort by a technical team to address fairness issue. Ability to see a status quo, either by default or optionally, increased the odds of recommending AI adoption. Women and ethnic minorities were less inclined to recommend AI, although not significantly. For the question of “probability that a fairness issue is alleged and becomes a problem”, the decision-makers were highly convinced by “scientific veneer” and expert’s pro-AI recommendation, believing that the risk of a lawsuit would decline. These findings echoed the original analysis with the exception of opposite trends in reading “fatalistic” op-ed in the first study.
+
+\newpage
+# Introduction
+
+  With the rapid development of technology, AI has entered our everyday lives, first entertaining us in sci-fi films and finally replacing human labour (Amazon warehouses being one of the most prominent examples). However, an ethical side of technology and adoption of AI was not considered for a long time. Recently, we witnessed a tremendous interest in ethical discussions of AI and algorithmic bias both by industry experts and society at large. Being an active consumer of tech and AI, I deemed it beneficial to explore how businesses - service and product providers, in particular management, respond to this growing interest. 
+  
+  My research landed on “The Managerial Effects of Algorithmic Fairness Activism” by Bo Cowgill, Fabrizio Dell’Acqua, and Sandra Matz (2020), which employed a survey to analyze subjects’ behaviour upon introduction to external discussions on consequences of AI adoption by businesses. I intended to follow the paper as closely as possible, however, the fact this work utilized R statistical software might have altered the replication as the original analysis was performed in Stata. Additionally, we might have used differing types of statistical models as the authors have not explicitly stated what type of regression they used. 
+  
+  The recruited respondents answered the questions based on to two business cases: hiring and lending. The survey consists of five questions, which the subjects had to answer twice to reflect their opinions on AI adoption before and after an algorithmic fix. The algorithmic fix was a 6-month team’s effort to address the fairness issues. Approximately equal number of subjects were recruited for two studies. Study 1 involved reading two op-eds - one was an article published in Fortune Magazine “AI Bias Isn’t the Problem. Our Society Is”; the second op-ed was an essay in Harvard Business review “Want Less-Biased Decisions? Use Algorithms”. The first essay discussed inability of AI to avoid bias and abandoning AI adoption; this op-ed was referred as “fatalistic”. The latter suggested use of AI if it helped to reduce a human bias; the authors of “The Managerial Effects...” labeled it as “counterfactual” as it was often compared to a status quo. In study 2, the respondents were introduced to an expert recommendation regarding AI adoption, which was presented with and without a “scientific veneer”. The recommendation with “scientific veneer” included scientific terms such as probability, p-value, beta coefficients, and logarithmic expressions. 
+
+
+```{r, include = FALSE}
+library(haven)
+library(tidyverse)
+library(lme4)
+library(mgcv)
+library(ggplot2)
+library(ggpubr)
+
+oped <- read_dta("Data/oped-desc.dta")
+veneer <- read_dta("Data/veneer-desc.dta")
+
+# glimpse(oped)
+# 
+# glimpse(veneer)
+
+```
+
+```{r, include=FALSE}
+#### OP-ED dataset ####
+# "response_id"              
+# "hiringfirst"              
+# "sqshw - status quo shown"                
+# "sqopt - status quo shown (only if clicked)"                   
+# "sqhid - status quo hidden"                    
+# "consrv_std - political conservatism, standardized"               
+# "cf: refers to the “counterfactual” condition. This is 1 for the subjects reading the counterfactual in the second case, and 0 for everyone in the first case."                       
+# "fat: refers to the “fatalism” condition. This is 1 for the subjects reading the fatalism in the second case, and 0 for everyone in the first case."                     
+# "sqseen_pre_first: Asked to View Status Quo pre First Bus. Case"         
+# "sqseen_pre_second"        
+# "posneg_pre_first: Positive arguments on impact of the technology pre first bus. case"         
+# "posneg_pre_second"       
+# "posneg_post_first"        
+# "posneg_post_second"       
+# "posneg_growth_first"      
+# "posneg_growth_second"    
+# "lawsuitspr_pre_first: Lawsuit/PR pre first bus. case"     
+# "lawsuitspr_pre_second"    
+# "lawsuitspr_post_first"    
+# "lawsuitspr_post_second"  
+# "lawsuitspr_growth_first"  
+# "lawsuitspr_growth_second" 
+# "damaging_pre_first: Damage size pre first bus. case"       
+# "damaging_pre_second"     
+# "damaging_post_first"      
+# "damaging_post_second"     
+# "damaging_growth_first"    
+# "damaging_growth_second"  
+# "recscale_pre_first: Recommendation on a continuous scale"       
+# "recscale_pre_second"      
+# "recscale_post_first"      
+# "recscale_post_second"    
+# "recscale_growth_first"    
+# "recscale_growth_second"   
+# "recyesno_pre_first: Recommendation as a binary decision"       
+# "recyesno_pre_second"     
+# "recyesno_post_first"      
+# "recyesno_post_second"     
+# "recyesno_growth_first"    
+# "recyesno_growth_second"  
+# "male"                     
+# "female"                   
+# "othergend"                
+# "hispanic: LatinX"                
+# "white"                    
+# "black"                    
+# "asian"                    
+# "otherethn"               
+# "workdecisions - AI decisions captures subjects who report working (or potentially working) in roles where they make decisions like those in our surveys."            
+# "eduprepared - prepared by education indicates whether subjects feel their education has prepared them well enough for this type of decisions."              
+# "knowsml - knows ML takes the value 1 if subjects know “a great deal”, “a lot”, or “a moderate amount” about machine learning and predictive modeling, and 0 otherwise."                  
+# "dataset"     
+
+#### Scientific veneer dataset ####
+# "response_id"              
+# "hiringfirst"              
+# "ma: Scientific Veneer"                       
+# "proai : refers to the condition in which a positive argument about AI ethics are made. This is 1 for the subjects reading the positive opinion in the second business case, and 0 for everyone in the first case."                   
+# "mapro: Scientific Veneer $\times$ Pro AI"                    
+# "sqshw"                    
+# "sqopt"                    
+# "sqhid"                   
+# "consrv_std"               
+# "sqseen_pre_first"         
+# "sqseen_pre_second"        
+# "posneg_pre_first"        
+# "posneg_pre_second"        
+# "posneg_post_first"        
+# "posneg_post_second"       
+# "posneg_growth_first"     
+# "posneg_growth_second"     
+# "lawsuitspr_pre_first"     
+# "lawsuitspr_pre_second"
+# "lawsuitspr_post_first"   
+# "lawsuitspr_post_second"   
+# "lawsuitspr_growth_first"  
+# "lawsuitspr_growth_second" 
+# "damaging_pre_first: Damage size pre first bus. case"      
+# "damaging_pre_second"      
+# "damaging_post_first"      
+# "damaging_post_second"     
+# "damaging_growth_first"   
+# "damaging_growth_second"   
+# "recscale_pre_first: Rec (Scale) pre first bus. case"       
+# "recscale_pre_second"      
+# "recscale_post_first"     
+# "recscale_post_second"     
+# "recscale_growth_first"    
+# "recscale_growth_second"   
+# "recyesno_pre_first: Rec (Y/N) pre first bus. case"      
+# "recyesno_pre_second"      
+# "recyesno_post_first"      
+# "recyesno_post_second"     
+# "recyesno_growth_first"   
+# "recyesno_growth_second"   
+# "male"                     
+# "female"                   
+# "othergend"               
+# "hispanic"                 
+# "white"                    
+# "black"                    
+# "asian"                   
+# "otherethn"                
+# "workdecisions"            
+# "eduprepared"              
+# "knowsml"                 
+# "dataset"  
+
+```
+
+\newpage
+# Datasets 
+
+  For the study, Prolific, an online survey platform, was used to collect data; the survey was conducted on January 8, 2020 in United States. 994 participants in managerial roles who most likely would be responsible for making AI adoption decisions in a workplace were recruited for two studies. The studies were then recorded in two datasets, containing the respondents’ answers to five questions, four of which were recorded on a Likert scale: potential positive/negative impact of technology, whether AI adoption would be recommended, about risk of a lawsuit or PR problems if AI was adopted, and the magnitude of the lawsuits or PR issue would be. The AI recommendation question was also recorded as a binary - “Yes”, “No” - response.  The rest of the variables reflected the respondents’ demography and were coded as zeros and ones (Table 1).
+
+*Table 1. Distribution of gender and ethnicity in the datasets*
+
+```{r}
+library(knitr)
+temp_df_ds_gen <- data.frame(Gender=c("Male",
+                                 "Female",
+                                 "Other gender"),
+                Study1=c(round(mean(oped$male), 2),
+                       round(mean(oped$female), 2), 
+                       round(mean(oped$othergend), 2)),
+                Study2 = c(round(mean(veneer$male), 2),
+                       round(mean(veneer$female), 2), 
+                       round(mean(veneer$othergend), 2)))
+
+kable(temp_df_ds_gen)
+```
+```{r}
+
+temp_df_ds_ethn <- data.frame(Ethnicity=c("White",
+                                 "Black",
+                                 "Asian",
+                                 "LatinX",
+                                 "Other ethnicity"),
+                Study1=c(round(mean(oped$white), 2),
+                       round(mean(oped$black), 2), 
+                       round(mean(oped$asian), 2),
+                       round(mean(oped$hispanic), 2),
+                       round(mean(oped$otherethn), 2)),
+                Study2=c(round(mean(veneer$white), 2),
+                       round(mean(veneer$black), 2), 
+                       round(mean(veneer$asian), 2),
+                       round(mean(veneer$hispanic), 2),
+                       round(mean(veneer$otherethn), 2)))
+
+kable(temp_df_ds_ethn)
+```
+
+  The two datasets differed by a few variables: the first contained “cf” – counterfactual and “fat” – fatalistic variables; the second dataset had “ma” – scientific veneer, “proai” – pro-AI expert recommendation, and “mapro” – scientific veneer X pro-AI expert recommendation. The variables of interest are described in the following section, and some interactions are shown in the figures below. Figures 1 and 3 illustrate no significant trends in AI recommendation after reading the op-eds and being exposed to “scientific veneer” along with pro-AI expert recommendations. In contrast, the responses to “a lawsuits question” tend to avoid extreme 1s and 7s.
+
+```{r, fig.height= 2.5, fig.width= 5}
+
+# oped %>% 
+#   ggplot(aes(x = consrv_std)) +
+#   geom_histogram(bins = 15) +
+#   theme_minimal()
+
+# oped %>% 
+#   ggplot(aes(x = consrv_std, y = as.factor(recyesno_post_first))) +
+#   geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+#   theme_minimal()
+
+rec1 <- oped %>% 
+  ggplot(aes(x = as.factor(cf), y = as.factor(recyesno_post_first))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Rec1",
+       x = "counterfactual") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+rec2 <- oped %>% 
+  ggplot(aes(x = as.factor(fat), y = as.factor(recyesno_post_first))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Rec1",
+       x = "fatalistic") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+rec3 <- oped %>% 
+  ggplot(aes(x = as.factor(cf), y = as.factor(recyesno_post_second))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Rec2",
+       x = "counterfactual") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+rec4 <- oped %>% 
+  ggplot(aes(x = as.factor(fat), y = as.factor(recyesno_post_second))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Rec2",
+       x = "fatalistic") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+fig_rec <- ggarrange(rec1, rec2, rec3, rec4,
+                    labels = c("A", 
+                               "B",
+                               "C", 
+                               "D"),
+                    label.y = 0.5,
+                    ncol = 1, nrow = 4)
+
+#save your plot in your images folder:
+ggsave("images/rec1.png", width = 5, height = 2.5)
+
+# annotate_figure(figure,
+#                top = text_grob("Visualizing Tooth Growth", color = "red", face = "bold", size = 14),
+#                bottom = text_grob("Data source: \n ToothGrowth data set", color = "blue",
+#                                   hjust = 1, x = 1, face = "italic", size = 10),
+#                left = text_grob("Figure arranged using ggpubr", color = "green", rot = 90),
+#                right = text_grob(bquote("Superscript: ("*kg~NH[3]~ha^-1~yr^-1*")"), rot = 90),
+#                fig.lab = "Figure 1", fig.lab.face = "bold"
+# )
+
+```
+
+![AI recommendation VS "counterfactual" and "fatalistic" for business case 1 (A,B) and 2 (C,D)](images/rec1.png)
+
+
+```{r}
+law1 <- oped %>% 
+  ggplot(aes(x = as.factor(cf), y = as.factor(lawsuitspr_post_first))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Lawsuits/PR",
+       x = "counterfactual") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+law2 <- oped %>% 
+  ggplot(aes(x = as.factor(fat), y = as.factor(lawsuitspr_post_first))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Lawsuits/PR",
+       x = "fatalistic") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+law3 <- oped %>% 
+  ggplot(aes(x = as.factor(cf), y = as.factor(lawsuitspr_post_second))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Lawsuits/PR",
+       x = "counterfactual") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+law4 <- oped %>% 
+  ggplot(aes(x = as.factor(fat), y = as.factor(lawsuitspr_post_second))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Lawsuits/PR",
+       x = "fatalistic") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+fig_law <- ggarrange(law1, law2, law3, law4,
+                    labels = c("A", 
+                               "B",
+                               "C", 
+                               "D"),
+                    ncol = 4, nrow = 1)
+#save your plot in your images folder:
+ggsave("images/law1.png", width = 5, height = 3)
+
+```
+
+![Lawsuits/PR VS "counterfactual" and "fatalistic" for business case 1 (A,B) and 2 (C,D)](images/law1.png)
+
+
+
+```{r}
+
+rec1_sv <- veneer %>% 
+  ggplot(aes(x = as.factor(ma), y = as.factor(recyesno_post_first))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Rec1",
+       x = "SciVeneer") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+rec2_sv <- veneer %>% 
+  ggplot(aes(x = as.factor(proai), y = as.factor(recyesno_post_first))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Rec1",
+       x = "ProAI") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+rec3_sv <- veneer %>% 
+  ggplot(aes(x = as.factor(ma), y = as.factor(recyesno_post_second))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Rec2",
+       x = "SciVeneer") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+rec4_sv <- veneer %>% 
+  ggplot(aes(x = as.factor(proai), y = as.factor(recyesno_post_second))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Rec2",
+       x = "ProAI") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+fig_rec_sv <- ggarrange(rec1_sv, rec2_sv, rec3_sv, rec4_sv,
+                    labels = c("A", 
+                               "B",
+                               "C", 
+                               "D"),
+                    ncol = 1, nrow = 4)
+
+#save your plot in your images folder:
+ggsave("images/sv_rec1.png", width = 5, height = 2.5)
+
+```
+
+![AI recommendation VS "Scientific Veneer" and "Pro AI" for business case 1 (A,B) and 2 (C,D)](images/sv_rec1.png)
+
+
+```{r}
+law1_sv <- veneer %>% 
+  ggplot(aes(x = as.factor(ma), y = as.factor(lawsuitspr_post_first))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Lawsuits/PR",
+       x = "SciVeneer") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+law2_sv <- veneer %>% 
+  ggplot(aes(x = as.factor(proai), y = as.factor(lawsuitspr_post_first))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Lawsuits/PR",
+       x = "ProAI") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+law3_sv <- veneer %>% 
+  ggplot(aes(x = as.factor(ma), y = as.factor(lawsuitspr_post_second))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Lawsuits/PR",
+       x = "SciVeneer") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+law4_sv <- veneer %>% 
+  ggplot(aes(x = as.factor(proai), y = as.factor(lawsuitspr_post_second))) +
+  geom_point(alpha=0.3, position=position_jitter(height=0, width=0.5)) +
+  theme_minimal()+
+  labs(y = "Lawsuits/PR",
+       x = "ProAI") +
+  theme(axis.text = element_text(size = 4),
+        axis.title = element_text(size = 5))
+
+fig_law_sv <- ggarrange(law1_sv, law2_sv, law3_sv, law4_sv,
+                    labels = c("A", 
+                               "B",
+                               "C", 
+                               "D"),
+                    ncol = 4, nrow = 1)
+
+#save your plot in your images folder:
+ggsave("images/sv_law1.png", width = 5, height = 3)
+
+```
+
+![Lawsuits/PR VS "Scientific Veneer" and "Pro AI" for business case 1 (A,B) and 2 (C,D)](images/sv_law1.png)
+
+
+```{r, include = F}
+library(ggplot2)
+library(ggpubr)
+
+#to combine Lawsuit/PR magnitude into one variable to facet wrap for better visualization:
+
+# oped_1 <- oped %>% 
+#   mutate(lawsuitspr_growth_first = as.factor(lawsuitspr_growth_first),
+#          lawsuitspr_growth_second = as.factor(lawsuitspr_growth_second)) %>% 
+#   pivot_longer(cols(oped$lawsuitspr_growth_first, oped$lawsuitspr_growth_second), names_to = "lawsuitpr_growth", values_to = "lpr_growth_values") %>% 
+#   ggplot(aes(x = lpr_growth_values,)) +
+#   geom_bar() +
+#   facet_wrap(~lawsuitpr_growth)
+
+  
+  
+p1 <- oped %>% 
+  ggplot(aes(x = posneg_pre_first,)) +
+  geom_bar(colour = "grey", fill = "#66261D")+
+  theme_minimal()
+
+p2 <- oped %>% 
+  ggplot(aes(x = posneg_post_first,)) +
+  geom_bar()+
+  theme_minimal()
+
+p3 <- oped %>% 
+  ggplot(aes(x = posneg_pre_second,)) +
+  geom_bar()+
+  theme_minimal()
+
+p4 <- oped %>% 
+  ggplot(aes(x = posneg_post_second,)) +
+  geom_bar()+
+  theme_minimal() +
+  labs(caption = "FigureXX. Distribution of responses for a question of positive AI impact on business cases")
+
+
+fig_p <- ggarrange(p1, p2, p3, p4,
+                    labels = c("Before first case", "After first case",
+                               "Before second case", "After second case"),
+                    ncol = 2, nrow = 2)
+
+
+
+#save your plot in your images folder, you can specify the height and width, too
+ggsave("images/positive.png", width = 10, height = 6)
+
+# notice how the image is included with the ![](file/path.png) below
+#   ![Distribution of responses for a question of positive AI impact on business cases](images/positive.png)
+```
+
+
+\newpage
+
+# Model
+
+__Binomial regression model__ Study 1: Counterfactual and "fatalism" op-eds. 
+
+\[Y_{i,j,fix}\sim Binomial(N_i, p_i)\]
+
+\[\log\left(\frac{p_i}{1-p_i}\right)= \beta_0+\beta_j\textrm{BusinessCaseOrder}+\beta_i\textrm{StatusQuo,Gender}+ \beta_{j,j}\textrm{CF}+\beta_{j,j}\textrm{FAT}+\] \[\beta_{j,j,fix}\textrm{CFxFix}+\beta_{j,j,fix}\textrm{FATxFix}+\beta_{i}\textrm{WD,Ed,ML}+\epsilon,\]
+
+
+***
+__Linear regression model__ Study 1: Counterfactual and "fatalism" op-eds.
+
+\[y_{i,j,fix} = \beta_0+\beta_j\textrm{BusinessCaseOrder}+\beta_i\textrm{StatusQuo,Gender}+ \beta_{j,j}\textrm{CF}+\beta_{j,j}\textrm{FAT}+\] \[\beta_{j,j,fix}\textrm{CFxFix}+\beta_{j,j,fix}\textrm{FATxFix}+\beta_{i}\textrm{WD,Ed,ML}+\epsilon,\]
+
+where:
+
+- $y_{i,j,fix}$ refers to the response to question Y individual i on case j regarding before/after the 6-month effort to fix.
+
+- $i$ indexes 498 subjects for Study 1.
+
+- $j$ = {0, 1} indexes the first or second order of the business cases.
+
+- $fix$ = {0, 1} differentiates answers to the questions before (fix = 0) or after (fix = 1) the six-months of dedicated effort.
+
+- $CF$ refers to the “counterfactual” condition: 1 for the subjects reading the counterfactual in the second case, and 0 for everyone in the first case.
+
+- $FAT$ refers to the “fatalism” condition: 1 for the subjects reading the fatalism in the second case, and 0 for everyone in the first case.
+
+- $CF\cdot Fix$ is equal to CF×1(fix=1).
+
+- $FAT\cdot Fix$ is equal to FAT × 1(fix = 1).
+
+- $\epsilon$ is standard errors.
+
+\newpage
+
+__Binomial regression model__ Study 2: "Scientific veneer".
+
+\[Y_{i,j,fix}\sim Binomial(N_i, p_i)\]
+
+\[\log\left(\frac{p_i}{1-p_i}\right)= \beta_0+\beta_j\textrm{BusinessCaseOrder}+\beta_i\textrm{StatusQuo}+\]
+\[\beta_i\textrm{Gender}+\beta_i\textrm{Ethnicity}+\beta_i\textrm{PoliticalConservatism}+\] \[\beta_{j,j}\textrm{SciVeneer}+\beta_{j,j}\textrm{ProAI}+\beta_{j,j}\textrm{SciVeneerXProAI}+\] \[\beta_{j,j,fix}\textrm{SciVeneerxFix}+\beta_{j,j,fix}\textrm{ProAIxFix}+\beta_{j,j,fix}\textrm{SciVeneerxProAIxFix}+\]
+\[\beta_{i}\textrm{WorkDecisions}+\beta_{i}\textrm{PreparedEd}+\beta_{i}\textrm{KnowsML}+\epsilon,\]
+
+***
+
+__Linear regression model__ Study 2: "Scientific veneer".
+
+\[y_{i,j,fix}= \beta_0+\beta_j\textrm{BusinessCaseOrder}+\beta_i\textrm{StatusQuo}+\]
+\[\beta_i\textrm{Gender}+\beta_i\textrm{Ethnicity}+\beta_i\textrm{PoliticalConservatism}+\] \[\beta_{j,j}\textrm{SciVeneer}+\beta_{j,j}\textrm{ProAI}+\beta_{j,j}\textrm{SciVeneerXProAI}+\] \[\beta_{j,j,fix}\textrm{SciVeneerxFix}+\beta_{j,j,fix}\textrm{ProAIxFix}+\beta_{j,j,fix}\textrm{SciVeneerxProAIxFix}+\]
+\[\beta_{i}\textrm{WorkDecisions}+\beta_{i}\textrm{PreparedEd}+\beta_{i}\textrm{KnowsML}+\epsilon,\]
+
+
+where:
+
+- $Y_{i,j,fix}$ refers to the response to question Y individual i on case j regarding before/after the 6-month effort to fix.
+
+- $i$ indexes 496 subjects for Study 2.
+
+- $j$ = {0, 1} indexes the first or second order of the business cases.
+
+- $fix$ = {0, 1} differentiates answers to the questions before (fix = 0) or after (fix = 1) the six-months of dedicated effort.
+
+- $SciVeneer$ refers to the “counterfactual” condition: 1 for the subjects reading the counterfactual in the second case, and 0 for everyone in the first case.
+
+- $ProAI$ refers to the condition in which a positive argument about AI ethics are made.
+
+- $SciVeneer$ refers to whether the expert applied scientific veneer. This is 1 for the subjects seeing scientific veneer in the second case, and 0 for everyone in the first case.
+
+- $SciVeneer\cdot ProAI$ refers to subjects who see pro-AI arguments with scientific veneer. This is 1 for the subjects reading these arguments in the second case, and 0 for everyone in the first case.
+
+- $ProAI\cdot Fix$ is equal to ProAI×1 (fix=1).
+
+- $SciVeneer\cdot Fix$ is equal to SciVen×1 (fix = 1).
+
+- $ProAI\cdot SciVeneer\cdot Fix$ is equal to ProAI×1 (fix=1).
+
+- $\epsilon$ is standard errors.
+
+
+\newpage
+
+# Analysis and Discussion
+
+  The survey performed by Cowgill and their colleagues included five questions. I chose to focus on the response to two questions: (1) If you were forced to make a decision on the future use of the algorithm now, what would you do? (2) What is the probability that a fairness issue is alleged and becomes a problem (through lawsuits or PR)? Since for the first question the variable of interest was binary (Figure 5) a multiple logistic regression was fitted. A linear regression was appropriate as the responses to the second question were recorded on a Likert scale - from 1 to 7 (Figure 6). In both cases, I included the predictors and their interactions chosen by Cowgill and their colleagues (Table 2). 
+
+*Table 2. Response and predictor variables for Study 1 and 2*
+
+|Dependent variables           |class            |description |
+|:----|:--|:-----------|
+|recyesno_post_first |numeric |A binary response to a question of AI adoption recommendation for first business case |
+|recyesno_post_second |numeric |A binary response to a question of AI adoption recommendation for second business case |
+|lawsuitspr_post_first |numeric |A response to a question of a perceived likelihood of a lawsuit or PR problem as a result of AI adoption for first business case |
+|lawsuitspr_post_second |numeric |A response to a question of a perceived likelihood of a lawsuit or PR problem as a result of AI adoption for second business case |
+
+
+|Independent variables           |class            |description |
+|:----|:--|:-----------|
+|response_id        |numeric          |Unique ID |
+|hiringfirst        | numeric         |Hiring is equal to 1 for the hiring business case and equal to 0 for the lending business case |
+|sqshw              |numeric          |Status Quo shown|
+|sqopt              |numeric          |Status Quo shown (only if clicked) |
+|sqhid              |numeric          |Status Quo hidden|
+|consrv_std         |numeric          |Political conservatism, standardized |
+|cf                 |numeric          |Refers to the “counterfactual” condition. This is 1 for the subjects reading the counterfactual in the second case, and 0 for everyone in the first case |
+|fat                |numeric          |Refers to the “fatalism” condition. This is 1 for the subjects reading the fatalism in the second case, and 0 for everyone in the first case|
+|ma                 |numeric          |Scientific Veneer |
+|proai                |numeric          |Refers to the condition in which a positive argument about AI ethics are made. This is 1 for the subjects reading the positive opinion in the second business case, and 0 for everyone in the first case|
+|mapro   |numeric          |Scientific Veneer $\times$ Pro AI|
+|female   |numeric          |Gender|
+|black      |numeric          |Ethnicity |
+|asian      |numeric          |Ethnicity |
+|workdecisions      |numeric          |AI decisions captures subjects who report working (or potentially working) in roles where they make decisions like those in our surveys |
+|eduprepared |numeric          |Indicates whether subjects feel their education has prepared them well enough for this type of decisions |
+|knowsml |numeric          |takes the value 1 if subjects know “a great deal”, “a lot”, or “a moderate amount” about machine learning and predictive modeling, and 0 otherwise | 
+
+
+
+```{r}
+# Recommendation as a binary decision - Study 1 : 
+
+oped_fac <- oped
+oped_fac[sapply(oped_fac, is.numeric)] <- lapply(oped_fac[sapply(oped_fac, is.numeric)], as.factor)
+
+r1 <- oped_fac %>% 
+  ggplot(aes(x = recyesno_pre_first,)) +
+  geom_bar(colour = "grey", fill = "#BA838A")+
+  theme_minimal()+
+  ylim(0,350) +
+  labs(title = "S1. Case1: before",
+       x = "Recommendation, case1",
+       caption = "")+
+  theme(axis.title.x = element_blank())
+
+r2 <- oped_fac %>% 
+  ggplot(aes(x = recyesno_post_first,)) +
+  geom_bar(colour = "grey", fill = "#901B0C")+
+  theme_minimal()+
+  ylim(0,350) +
+  theme(axis.title.x = element_blank()) +
+  labs(title = "and after fix",
+       caption = "")
+
+r3 <- oped_fac %>% 
+  ggplot(aes(x = recyesno_pre_second,)) +
+  geom_bar(colour = "grey", fill = "#BA838A")+
+  theme_minimal()+
+  ylim(0,350) +
+  labs(title = "Case2: before ",
+       x = "Recommendation: yes, no",
+       caption = "")+
+  theme(axis.title.x = element_blank())
+
+r4 <- oped_fac %>% 
+  ggplot(aes(x = recyesno_post_second,)) +
+  geom_bar(colour = "grey", fill = "#901B0C")+
+  theme_minimal()+
+  ylim(0,350)+
+  theme(axis.title.x = element_blank())+
+  labs(title = "and after fix",
+       caption = "Recommendation: Yes and No")
+
+# Study2 :  
+
+veneer_fac <- veneer
+
+veneer_fac[sapply(veneer_fac, is.numeric)] <- lapply(veneer_fac[sapply(veneer_fac, is.numeric)], as.factor)
+
+r1_v <- veneer_fac %>% 
+  ggplot(aes(x = recyesno_pre_first,)) +
+  geom_bar(colour = "grey", fill = "#BA838A")+
+  theme_minimal()+
+  ylim(0,350) +
+  labs(title = "S2. Case1: before ",
+       x = "Recommendation: yes, no",
+       caption = "")+
+  theme(axis.title.x = element_blank())
+
+r2_v <- veneer_fac %>% 
+  ggplot(aes(x = recyesno_post_first,)) +
+  geom_bar(colour = "grey", fill = "#901B0C")+
+  theme_minimal()+
+  ylim(0,350)+
+  theme(axis.title.x = element_blank())+
+  labs(title = "and after fix",
+       caption = "")
+
+r3_v <- veneer_fac %>% 
+  ggplot(aes(x = recyesno_pre_second,)) +
+  geom_bar(colour = "grey", fill = "#BA838A")+
+  theme_minimal()+
+  ylim(0,350)+
+  labs(title = "Case2: before ",
+       x = "Recommendation: yes, no",
+       caption = "")+
+  theme(axis.title.x = element_blank())
+
+r4_v <- veneer_fac %>% 
+  ggplot(aes(x = recyesno_post_second,)) +
+  geom_bar(colour = "grey", fill = "#901B0C")+
+  theme_minimal()+
+  ylim(0,350)+
+  theme(axis.title.x = element_blank())+
+  labs(title = "and after fix",
+       caption = "Recommendation: Yes and No")
+
+
+fig_r_opedsv <- ggarrange(r1, r2, r3, r4,
+                      r1_v, r2_v, r3_v, r4_v,
+                    # labels = c("S1. Case1: before and", "after fix",
+                    #            "Case2: before and", "after fix",
+                    #            "S2. First case: before fix", "after fix",
+                    #            "Second case: before fix", "after fix"),
+                    ncol = 4, nrow = 2)
+
+#save your plot in your images folder:
+ggsave("images/oped_sv_recommendation_yn.png", width = 6, height = 4)
+
+
+# fig_r <- ggarrange(r1, r2, r3, r4,
+#                     labels = c("First case: before fix", "after fix",
+#                                "Second case: before fix", "after fix"),
+#                     ncol = 2, nrow = 2)
+# 
+# #save your plot in your images folder:
+# ggsave("images/recommendation_yn.png", width = 6, height = 4)
+
+```
+
+![Distribution of responses for a question of AI recommendation before and after algorithmic fix for two business cases (Study1 top row, Study2 bottom row)](images/oped_sv_recommendation_yn.png)
+
+
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+
+l1 <- oped %>% 
+  ggplot(aes(x = lawsuitspr_pre_first,)) +
+  geom_bar(colour = "grey", fill = "#BA838A")+
+  theme_minimal() +
+  ylim(0,150)+
+  labs(title = "S1. Case1: before ",
+       caption = "")+
+  theme(axis.title.x = element_blank())
+
+l2 <- oped %>% 
+  ggplot(aes(x = lawsuitspr_post_first,)) +
+  geom_bar(colour = "grey", fill = "#901B0C")+
+  theme_minimal()+
+  ylim(0,150)+
+  theme(axis.title.x = element_blank())+
+  labs(title = "and after fix",
+       caption = "")
+
+
+l3 <- oped %>% 
+  ggplot(aes(x = lawsuitspr_pre_second,)) +
+  geom_bar(colour = "grey", fill = "#BA838A")+
+  theme_minimal()+
+  ylim(0,150)+
+  theme(axis.title.x = element_blank())+
+  labs(title = "Case2: before ",
+       caption = "")
+
+
+l4 <- oped %>% 
+  ggplot(aes(x = lawsuitspr_post_second,)) +
+  geom_bar(colour = "grey", fill = "#901B0C")+
+  theme_minimal()+
+  ylim(0,150)+
+  theme(axis.title.x = element_blank())+
+  labs(title = "and after fix",
+       caption = "")
+
+
+l1_v <- veneer %>% 
+  ggplot(aes(x = lawsuitspr_pre_first,)) +
+  geom_bar(colour = "grey", fill = "#BA838A")+
+  theme_minimal() +
+  ylim(0,150)+
+  labs(title = "S2. Case1: before ",
+       x = "Probability of ",
+       caption = "")+
+  theme(axis.title.x = element_blank())
+
+l2_v <- veneer %>% 
+  ggplot(aes(x = lawsuitspr_post_first,)) +
+  geom_bar(colour = "grey", fill = "#901B0C")+
+  theme_minimal()+
+  ylim(0,150)+
+  #theme(axis.title.x = element_blank())+
+  labs(title = "and after fix",
+       x = " lawsuits/PR",
+       caption = "")+
+  theme(axis.title.x = element_blank())
+
+
+l3_v <- veneer %>% 
+  ggplot(aes(x = lawsuitspr_pre_second,)) +
+  geom_bar(colour = "grey", fill = "#BA838A")+
+  theme_minimal()+
+  ylim(0,150)+
+  labs(title = "Case2: before ",
+       x = "Probability of ",
+       caption = "")+
+  theme(axis.title.x = element_blank())
+
+l4_v <- veneer %>% 
+  ggplot(aes(x = lawsuitspr_post_second,)) +
+  geom_bar(colour = "grey", fill = "#901B0C")+
+  theme_minimal()+
+  ylim(0,150)+
+  theme(axis.title.x = element_blank())+
+  labs(title = "and after fix",
+       x = " lawsuits/PR",
+       caption = "Probability of AI adoption to become a lawsuit or PR problem on  Likert scale, from 1 to 7")
+
+  #labs(caption = "FigureXX. Distribution of responses for a question of positive AI impact on business cases")
+
+fig_l_sv <- ggarrange(l1, l2, l3, l4,
+                      l1_v, l2_v, l3_v, l4_v,
+                    # labels = c("First case, before fix", "First case, after fix",
+                    #            "Second case, before fix", "Second case, after fix"),
+                    ncol = 4, nrow = 2)
+
+#save your plot in your images folder, you can specify the height and width, too
+ggsave("images/opedsv_lawsuitpr.png", width = 6, height = 4)
+
+# fig_p <- ggarrange(l1, l2, l3, l4,
+#                     labels = c("First case, before fix", "First case, after fix",
+#                                "Second case, before fix", "Second case, after fix"),
+#                     ncol = 2, nrow = 2)
+# 
+# #save your plot in your images folder, you can specify the height and width, too
+# ggsave("images/lawsuitpr.png", width = 6, height = 4)
+```
+
+
+![Distribution of responses for a question of likelihood of a lawsuit or PR problem (Study1 top row, Study2 bottom row)](images/opedsv_lawsuitpr.png)
+
+
+
+  In the first study, being exposed to both “counterfactual” and “fatalistic” op-eds influenced the respondents’ opinion to recommend AI negatively - the coefficients ranged from -2.23 to -1.15. Ability to see a status quo, either by default or optionally, increased the odds of recommending AI adoption (Figure 8). Women and ethnic minorities were less inclined to recommend AI, although not significantly. The binomial regression produced positive coefficients for interaction of op-eds and an algorithmic fix - a 6-month effort to remove/reduce bias, illustrating that the respondents would strongly recommend AI adoption no matter what type of op-ed they were exposed to. 
+
+\newpage
+*Summary 1. Logistic regression summary on AI adoption recommendation question, Study 1*
+__First case__
+```{r}
+
+library(broom)
+# First case:
+mod_comb <- glm(recyesno_post_first ~ hiringfirst+cf+fat+ sqshw+sqopt+female+black+asian+consrv_std+workdecisions+eduprepared+knowsml+cf:recyesno_pre_first+fat:recyesno_pre_first, family = "binomial", data = oped)
+out <- tidy(mod_comb)
+kable(out)
+```
+__Second case__
+```{r}
+
+# Second case:
+mod_comb2 <- glm(recyesno_post_second ~ hiringfirst+cf+fat+ sqshw+sqopt+female+black+asian+consrv_std+workdecisions+eduprepared+knowsml+cf:recyesno_pre_second+fat:recyesno_pre_second, family = "binomial", data = oped)
+tab_modcomb2 <- tidy(mod_comb2)
+kable(tab_modcomb2)
+
+```
+
+
+```{r, fig.align ='left', fig.height=3}
+library(margins)
+# 3 plots to be combined in 2 row/ 2 columns and arranged by row
+# layout(matrix(c(1, 1, 2, 3), nrow = 2, byrow = TRUE))
+
+par(mfrow = c(1, 4))
+#layout(matrix(c(1, 2, 3, 4), nrow = 2, byrow = FALSE))
+cplot(mod_comb, "cf")
+
+cplot(mod_comb, "fat")
+
+cplot(mod_comb, "sqshw")
+
+cplot(mod_comb, "sqopt")
+
+```
+*__Figure 8:__ Plotted __predicted values__ for the variables of interest such as "Counterfactual", "Fatalistic", "Status Quo Shown", and "Status Quo Shown (if clicked)"*
+
+
+  
+  I have performed a basic regression assumption check for all the models by plotting them. Figure 7 in Appendix A shows that the assumptions of linearity and normality are met (Residuals vs Fitted and Normal Q-Q plots), whereas the assumption of homoscedasticity (constant variance) does not hold too well. The Residuals vs Leverage plot demonstrates no outliers in the data. 
+
+  Since a binary logistic regression does not produce an R2, many conflicting discussions persist on methods of measuring goodness-of-fit of the model. McFadden’s Pseudo-R2 is one of such methods, which I employed in the analysis. According to McFadden (1977), the Pseudo-R2’s values are considerably lower, thus Pseudo-R2 of 0.18 is high enough, indicating that our model fits the data well and has moderate to high predictive power. I have also checked for multicollinearity of the independent variables. Although the “counterfactual” and algorithmic fix interaction term has a higher value, I have kept it the regression in order to be consistent with the original paper. These results can be found in Appendix B.
+
+```{r, include=FALSE}
+#### First business case model:
+pscl::pR2(mod_comb)["McFadden"]
+#A value of 0.18 is high enough for McFadden’s R2, which indicates that our model fits the data well and has moderate to high predictive power.
+
+
+caret::varImp(mod_comb)
+#Higher values indicate more importance. These results match up nicely with the p-values from the model. 
+
+car::vif(mod_comb)
+
+#As a rule of thumb, VIF values above 5 indicate severe multicollinearity.
+
+#Second business case model:
+
+pscl::pR2(mod_comb2)["McFadden"]
+
+caret::varImp(mod_comb2)
+
+car::vif(mod_comb2)
+
+```
+
+  For the second question of a possibility of a lawsuit or a PR problem, “cf” and “fat” and their interaction with an algorithmic fix proved to be important predictors. Here, after reading both “cf” and “fat” op-eds, the respondents were convinced that issue arising from AI adoption would be reduced (Summary 2). 
+
+
+*Summary 2. Linear regression summary on lawsuits/PR problems likelihood question, Study 1*
+__First case__
+```{r, fig.align ='left'}
+
+#colnames(oped)
+
+library(broom)
+
+# First case:
+mod_lawsuit_oped <- lm(lawsuitspr_post_first ~ hiringfirst+cf+fat+ sqshw+sqopt+female+black+asian+consrv_std+workdecisions+eduprepared+knowsml+cf:lawsuitspr_pre_first+fat:lawsuitspr_pre_first, data = oped)
+
+tab_law1 <- tidy(mod_lawsuit_oped)
+kable(tab_law1)
+
+```
+__Second case__
+```{r}
+# Second case:
+mod_lawsuit_oped2 <- lm(lawsuitspr_post_second ~ hiringfirst+cf+fat+ sqshw+sqopt+female+black+asian+consrv_std+workdecisions+eduprepared+knowsml+cf:lawsuitspr_pre_second+fat:lawsuitspr_pre_second, data = oped)
+
+# Regression assumption check:
+# par(mfrow = c(2, 3))
+# #layout(matrix(c(1, 2, 3, 4), nrow = 2, byrow = TRUE))
+# plot(mod_lawsuit_oped)
+# 
+# #Outliers:
+# out_law1 <- boxplot.stats(mod_lawsuit_oped$residuals)$out
+# boxplot(mod_lawsuit_oped$residuals)
+# mtext(paste("Outliers: ", paste(out_law1, collapse=", ")), cex=0.6)
+
+tab_law2 <- tidy(mod_lawsuit_oped2)
+kable(tab_law2)
+
+
+```
+
+```{r}
+# Regression assumption check:
+par(mfrow = c(2, 3))
+#layout(matrix(c(1, 2, 3, 4), nrow = 2, byrow = TRUE))
+plot(mod_lawsuit_oped)
+
+#Outliers:
+out_law1 <- boxplot.stats(mod_lawsuit_oped$residuals)$out
+boxplot(mod_lawsuit_oped$residuals)
+mtext(paste("Outliers: ", paste(out_law1, collapse=", ")), cex=0.6)
+
+```
+*__Figure 9:__ Linear regression assumptions check: linearity, normality, homoscedasticity, and outliers for business case 1 and 2.*
+
+\newpage
+
+  As outlined earlier, the second study involved an AI expert recommendation with and without “scientific veneer”, which was not too significant on its own (Figure 10). As shown in Summary 3, AI adoption recommendation, the predictors “Status Quo”, “ProAI” and its interactions with “SciVeneer” and “Fix” were mostly positively associated with AI adoption, except for “ProAI” predictor in the second business case. Political conservatism of the respondents was slightly influential on AI recommendation, too. The goodness-of-fit for this model was not significantly different from the previous study; it can be found in the Appendix D. 
+
+*Summary 3. Logistic regression summary on AI adoption recommendation question, Study 2*
+__First case__
+```{r}
+
+library(broom)
+
+# Fisrt case:
+mod_sv <- glm(recyesno_post_first ~ hiringfirst+ma+proai+mapro+ sqshw+sqopt+female+black+asian+consrv_std+workdecisions+eduprepared+knowsml+ma:recyesno_pre_first+proai:recyesno_pre_first+mapro:recyesno_pre_first, family = "binomial", data = veneer)
+
+out_sv <- tidy(mod_sv)
+kable(out_sv)
+```
+__Second case__
+```{r}
+# Second case:
+mod_sv2 <- glm(recyesno_post_second ~ hiringfirst+ma+proai+mapro+ sqshw+sqopt+female+black+asian+consrv_std+workdecisions+eduprepared+knowsml+ma:recyesno_pre_second+proai:recyesno_pre_second+mapro:recyesno_pre_second, family = "binomial", data = veneer)
+
+out_sv2 <- tidy(mod_sv2)
+kable(out_sv2)
+
+```
+
+
+```{r, fig.align = 'left', fig.height=3}
+par(mfrow = c(1, 4))
+# not significant:
+cplot(mod_sv, "ma")
+
+#significant
+cplot(mod_sv, "proai")
+
+cplot(mod_sv, "mapro")
+
+cplot(mod_sv, "consrv_std")
+
+```
+*__Figure 10__ Plotted __predicted values__ for the variables of interest such as "Scientific Veneer", "Pro-AI expert recommendation", "Scientific Veneer X Pro-AI", and "Political conservatism"*
+
+  For the question of “probability that a fairness issue is alleged and becomes a problem”, the decision-makers were highly convinced by “scientific veneer” and expert’s pro-AI recommendation, believing that the risk of a lawsuit would decline. These beliefs did not hold well after interaction with algorithmic fix. Surprisingly, the respondents’ specialized education in AI, their knowledge of machine learning, and practical experience in decision-making did not prove to be important in these studies setting until this point: in the second business case knowledge of machine learning and work experience in decision-making were significantly influential on perceived likelihood of a problem or lawsuit (Summary 4). 
+
+\newpage
+*Summary 4. Linear regression summary on lawsuits/PR problems likelihood question, Study 2*
+__First case__
+```{r, fig.align ='left'}
+
+#colnames(veneer)
+
+library(broom)
+
+# First case:
+mod_lawsuit_sv <- lm(lawsuitspr_post_first ~ hiringfirst+ma+proai+mapro+ sqshw+sqopt+female+black+asian+consrv_std+workdecisions+eduprepared+knowsml+ma:lawsuitspr_pre_first+proai:lawsuitspr_pre_first+mapro:lawsuitspr_pre_first, data = veneer)
+
+#summary(mod_lawsuit_sv)
+
+tab_law_sv <- tidy(mod_lawsuit_sv)
+kable(tab_law_sv)
+```
+__Second case__
+```{r}
+# Second case:
+mod_lawsuit_sv2 <- lm(lawsuitspr_post_second ~ hiringfirst+ma+proai+mapro+ sqshw+sqopt+female+black+asian+consrv_std+workdecisions+eduprepared+knowsml+ma:lawsuitspr_pre_second+proai:lawsuitspr_pre_second+mapro:lawsuitspr_pre_second, data = veneer)
+#summary(mod_lawsuit_sv2)
+
+tab_law_sv2 <- tidy(mod_lawsuit_sv2)
+kable(tab_law_sv2)
+
+
+```
+
+  Overall, the results of this analysis follow closely the original work of Cowgill and their colleagues. In both analyses, women and ethnic minorities opposed AI adoption. Along with the authors of the original paper, I witnessed strong trends that six months of focused engineering efforts perceived to be effective by the decision-makers along with a strong evidence of scientific veneer affecting the AI adoption decisions positively – the respondents recommended algorithm adoption more when the opinion was in favor of AI. Although a clear evidence that reading counterfactual op-ed convinced the decision-makers of a less probable likelihood of lawsuits and PR problems matched Cowgill’s findings, this analysis proved that reading the same op-ed discouraged AI adoption, which opposes the results of the original work. Another contradictory finding was about influence of reading fatalistic op-ed on lawsuits likeliness. According to Cowgill and their co-workers, the two events were positively correlated, my analysis proved it otherwise.
+
+\newpage
+## Limitations
+
+  Some limitations associated with a broad understanding of algorithmic activism, others arose from technical differences in two analyses and level of expertise, in particular. Firstly, Cowgill et al. (2020) employed Stata statistical software, which is considerably different than R programming language I used for this analysis. Secondly, the authors of The Managerial Effects... collected the data via a survey having access to the original dataset. I, however, acquired the dataset from the Open ICPSR data repository. A very close study of the paper and data convinced me that the latter was slightly re-shaped. Lastly, I have only explored two questions out of five and not omitted a few term interactions, potentially missing on additional trends in the data. All of the above could have led to differences in findings.
+  
+  Additionally, I have noticed that some variables were omitted from the original analysis without explanation, and some variables, being present in the code, were not included in the write-up. This introduced a major challenge, limiting reproducibility of the original work. 
+  
+  Two business cases of hiring and lending explored potential bias against women and ethnic minorities. And although women represented half of the respondents, ethnic diversity was majorly undermined as over 80% of the decision-makers were white. This undoubtedly has influenced the results of the analysis. Another limitation stemmed from the lack of literature review in both analyses.
+
+# Conclusion
+
+  Discussions on algorithmic decision making and ethics of AI adoption have been on an ever-increasing trend in recent years. I attempted to replicate one of the available analysis of a survey conducted by Cowgill, Dell’Acqua, and Matz in 2020. Their analysis tackled the issue of AI adoption by managers and various factors influencing their decision. Despite some challenges in picking predictor variables and data discrepancy, I have achieved tangible results in replication as most of my findings mirrored the original work. This success encouraged me to research on the topic of algorithmic decision making as this field provides practical solutions and insights into the field of AI and machine learning. Some of the important questions can be answered via combination of qualitative and quantitative analysis such as The Managerial Effects of Algorithmic Fairness Activism. Since technology plays an integral part in our lives, society and the industry experts require broader and deeper understanding of algorithmic bias and ways to learn to deal with the challenge.
+
+\newpage
+
+# References
+
+- Cowgill, B., Dell’Acqua, F., and Matz, S. (2020). The Managerial Effects of Algorithmic Fairness Activism. https://www.aeaweb.org/articles?id=10.1257/pandp.20201035
+
+- Datasets. (2020). https://www.openicpsr.org/openicpsr/project/120752/version/V1/view?path=/openicpsr/120752/fcr:versions/V1/README&type=file
+
+- McFadden, D. (1974). Conditional logit analysis of qualitative choice behavior. Pp. 105-142 in P. Zarembka (ed.), Frontiers in Econometrics. Academic Press. http://eml.berkeley.edu/~mcfadden/travel.html
+
+- McFadden, D. (1977). Quantitative Methods for Analyzing Travel Behaviour on Individuals: Some Recent Developments. Cowles Foundation for Research in Economics at Yale University.
+
+
+\newpage
+
+# Appendix A 
+
+### Figure 7. Regression assumptions check
+
+```{r, fig.align='left'}
+# Regression assumptions check case1:
+par(mfrow = c(2, 2))
+plot(mod_comb)
+
+# Regression assumptions check case2:
+par(mfrow = c(2, 2))
+plot(mod_comb2)
+```
+*Figure7. Regression assumptions check: linearity, normality, homoscedasticity, and outliers for business case 1 and 2. Plot 1 - Residuals vs Fitted - demonstrates __linearity__, which holds considerably well as the red line closely follows the dotted line. __Homoscedasticity__: The Scale-Location plot revealed that the points are not perfectly equally spread around the red line, meaning that the assumption of constant variance does not hold too well. __Normality__: The QQplot shows that the model is normal because the points are for the most part follow the dotted line. __Outliers__ The plot 4 - Residuals vs Leverage - reveals no influential points as the Cook's distance red dashed line does not show.*
+
+\newpage
+# Appendix B
+
+### Checking for model fit - Log Regr Mod St2 - Two cases - Recommendation Yes No
+```{r}
+#### First business case model:
+pscl::pR2(mod_sv)["McFadden"]
+#A value of 0.24 is high for McFadden’s R2, which indicates that our model fits the data very well and has high predictive power.
+
+#Higher values indicate more importance. These results match up nicely with the p-values from the model:
+#caret::varImp(mod_sv)
+ 
+#As a rule of thumb, VIF values above 5 indicate severe multicollinearity:
+car::vif(mod_sv)
+#mapro, mapro:rec - severe multicollinearity
+
+
+#Second business case model:
+
+pscl::pR2(mod_sv2)["McFadden"]
+#A value of 0.11 is high enough for McFadden’s R2, which indicates that our model fits the data considerably well and has moderate predictive power.
+
+#caret::varImp(mod_sv2)
+
+car::vif(mod_sv2)
+# mapro, proai, proai:rec, mapro:rec - severe multicollinearity
+
+```
+
+# Appendix C 
+
+### St 1 estimated binomial regression model is:
+
+\[\log\left(\frac{\hat{p}}{1-\hat{p}}\right) = 
+-0.17-0.16\cdot\textrm{BusinessCaseOrder}+1.27\cdot\textrm{StatusQuoShown}+\]
+\[1.15\cdot\textrm{StatusQuoShown(only if clicked)}-\]
+\[0.06\cdot\textrm{Female}-0.36\cdot\textrm{Black}-0.49\cdot\textrm{Asian}-0.01\cdot\textrm{PolitConserv}-\]
+\[1.15\cdot\textrm{CF}-1.24\cdot\textrm{FAT}+\] \[2.68\cdot\textrm{CFxFix}+1.35\cdot\textrm{FATxFix}+\]
+\[0.15\cdot\textrm{WorkDecD}+0.23\cdot\textrm{Ed}-0.17\cdot\textrm{ML}\]
+
+### St 2 estimated binomial regression model is:
+
+\[\log\left(\frac{\hat{p}}{1-\hat{p}}\right) = 
+-1.78+0.19\cdot\textrm{BusinessCaseOrder}+1.02\cdot\textrm{StatusQuoShown}+\]
+\[1.27\cdot\textrm{StatusQuoShown(only if clicked)}+\]
+\[0.04\cdot\textrm{Female}-0.51\cdot\textrm{Black}- 0.66\cdot\textrm{Asian}+0.31\cdot\textrm{PolitConserv}-\]
+\[0.55\cdot\textrm{SciVeneer}+1.22\cdot\textrm{ProAI}+1.38\cdot\textrm{SciVeneerXProAI}+\] \[0.97\cdot\textrm{SciVeneerxFix}+1.35\cdot\textrm{ProAIxFix}-1.79\cdot\textrm{SciVeneerXProAIXFix}-\]
+\[0.23\cdot\textrm{WorkDecD}+0.16\cdot\textrm{Ed}+0.28\cdot\textrm{ML}\]
+
+\newpage
+# Appendix D
+
+### Linear regression assumption check on lawsuits/PR problems likelihood question for case 1 and 2, St2.
+```{r}
+# Regression assumption check:
+par(mfrow = c(2, 3))
+#layout(matrix(c(1, 2, 3, 4), nrow = 2, byrow = TRUE))
+plot(mod_lawsuit_sv)
+
+#Outliers:
+out_law_sv <- boxplot.stats(mod_lawsuit_sv$residuals)$out
+boxplot(mod_lawsuit_sv$residuals)
+mtext(paste("Outliers: ", paste(out_law_sv, collapse=", ")), cex=0.6)
+
+# Regression assumption check:
+par(mfrow = c(2, 3))
+# #layout(matrix(c(1, 2, 3, 4), nrow = 2, byrow = TRUE))
+plot(mod_lawsuit_sv2)
+# 
+# #Outliers:
+out_law_sv1 <- boxplot.stats(mod_lawsuit_sv2$residuals)$out
+boxplot(mod_lawsuit_sv2$residuals)
+mtext(paste("Outliers: ", paste(out_law_sv1, collapse=", ")), cex=0.5)
+
+```
+
